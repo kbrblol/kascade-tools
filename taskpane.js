@@ -66,21 +66,30 @@ function pickActiveCell() {
 function loadNamedRanges() {
   Excel.run(function (ctx) {
     var names = ctx.workbook.names;
-    names.load("items/name");
+    names.load("items");
     return ctx.sync().then(function () {
       var sel = document.getElementById("cascade-range");
       sel.innerHTML = '<option value="">— Select a named range —</option>';
 
+      // Built-in names to skip
+      var builtIn = ["print_area", "print_titles", "_xlnm.print_area", "_xlnm.print_titles",
+                     "sheet_title", "_xlnm.database", "_xlnm.criteria", "_xlnm.extract"];
+      var added = 0;
+
       names.items.forEach(function (n) {
-        // Skip hidden or built-in names
-        if (n.name.indexOf("_") === 0) return;
+        var nameLower = n.name.toLowerCase();
+        // Skip built-in Excel names
+        if (builtIn.indexOf(nameLower) !== -1) return;
+        if (nameLower.indexOf("_xlnm.") === 0) return;
+
         var opt = document.createElement("option");
         opt.value = n.name;
         opt.textContent = n.name;
         sel.appendChild(opt);
+        added++;
       });
 
-      if (names.items.length === 0) {
+      if (added === 0) {
         sel.innerHTML = '<option value="">No named ranges found</option>';
       }
     });
