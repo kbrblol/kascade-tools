@@ -64,36 +64,51 @@ function pickActiveCell() {
 
 // Populate the named-range dropdown
 function loadNamedRanges() {
+  var sel = document.getElementById("cascade-range");
+  sel.innerHTML = '<option value="">Loading...</option>';
+
   Excel.run(function (ctx) {
-    var names = ctx.workbook.names;
-    names.load("items");
+    // Load workbook-level named ranges
+    var wbNames = ctx.workbook.names;
+    wbNames.load("items/name");
+
+    // Also load active sheet's named ranges (sheet-scoped)
+    var sheet = ctx.workbook.worksheets.getActiveWorksheet();
+    var sheetNames = sheet.names;
+    sheetNames.load("items/name");
+
     return ctx.sync().then(function () {
-      var sel = document.getElementById("cascade-range");
       sel.innerHTML = '<option value="">— Select a named range —</option>';
 
-      // Built-in names to skip
       var builtIn = ["print_area", "print_titles", "_xlnm.print_area", "_xlnm.print_titles",
                      "sheet_title", "_xlnm.database", "_xlnm.criteria", "_xlnm.extract"];
       var added = 0;
+      var seen = {};
 
-      names.items.forEach(function (n) {
+      function addName(n) {
         var nameLower = n.name.toLowerCase();
-        // Skip built-in Excel names
         if (builtIn.indexOf(nameLower) !== -1) return;
         if (nameLower.indexOf("_xlnm.") === 0) return;
+        if (seen[nameLower]) return;
+        seen[nameLower] = true;
 
         var opt = document.createElement("option");
         opt.value = n.name;
         opt.textContent = n.name;
         sel.appendChild(opt);
         added++;
-      });
+      }
+
+      wbNames.items.forEach(addName);
+      sheetNames.items.forEach(addName);
 
       if (added === 0) {
-        sel.innerHTML = '<option value="">No named ranges found</option>';
+        sel.innerHTML = '<option value="">No named ranges found (' + wbNames.items.length + ' workbook, ' + sheetNames.items.length + ' sheet)</option>';
+      } else {
+        showStatus("cascade", "Loaded " + added + " named range(s).", "success");
       }
     });
-  }).catch(function (err) { showStatus("cascade", err.message, "error"); });
+  }).catch(function (err) { showStatus("cascade", "Error loading names: " + err.message, "error"); });
 }
 
 // When a named range is selected, preview its values
