@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kascade</title>
+  <link rel="stylesheet" href="taskpane.css" />
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+</head>
+<body>
+  <div id="app">
+    <!-- Tab Navigation -->
+    <nav class="tabs">
+      <button class="tab active" data-tab="cascade">Cascade</button>
+      <button class="tab" data-tab="groups">Row Groups</button>
+    </nav>
+
+    <!-- ═══════════════ CASCADE TAB ═══════════════ -->
+    <section id="tab-cascade" class="tab-content active">
+      <div class="section">
+        <h2>Cascade Sheet</h2>
+        <p class="hint">Duplicate the active sheet for each value in a named range, replacing a target cell on each copy.</p>
+      </div>
+
+      <div class="section">
+        <label for="cascade-cell">Target cell</label>
+        <div class="input-row">
+          <input type="text" id="cascade-cell" placeholder="e.g. B2" readonly />
+          <button id="btn-pick-cell" class="btn-sm" title="Use active cell">Pick</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <label for="cascade-range">Named range</label>
+        <select id="cascade-range">
+          <option value="">Loading...</option>
+        </select>
+        <button id="btn-refresh-ranges" class="btn-sm btn-link">Refresh list</button>
+      </div>
+
+      <div class="section" id="cascade-preview-section" style="display:none;">
+        <label>Preview <span id="cascade-count" class="badge"></span></label>
+        <ul id="cascade-preview" class="preview-list"></ul>
+      </div>
+
+      <div class="section">
+        <button id="btn-cascade" class="btn-primary" disabled>Cascade</button>
+      </div>
+
+      <div id="cascade-status" class="status" style="display:none;"></div>
+    </section>
+
+    <!-- ═══════════════ ROW GROUPS TAB ═══════════════ -->
+    <section id="tab-groups" class="tab-content">
+      <div class="section">
+        <h2>Row Groups</h2>
+        <p class="hint">Type <code>#hide</code> to hide rows, <code>#hidecol:D</code> to hide columns, or any <code>#group</code> name for manual toggling. Click Refresh to apply.</p>
+      </div>
+
+      <!-- Refresh button -->
+      <div class="section">
+        <button id="btn-refresh-groups" class="btn-primary">Refresh</button>
+        <p class="hint" style="margin-top:4px;">Scans all columns for tags starting with <code>#</code>.</p>
+      </div>
+
+      <!-- Discovered groups -->
+      <div class="section">
+        <label>Groups on this sheet</label>
+        <div id="groups-list" class="groups-list">
+          <p class="hint">Click Refresh to scan.</p>
+        </div>
+      </div>
+
+      <div class="section btn-row">
+        <button id="btn-show-all" class="btn-secondary">Show all rows</button>
+        <button id="btn-hide-tagged" class="btn-secondary">Hide all tagged</button>
+      </div>
+
+      <div id="groups-status" class="status" style="display:none;"></div>
+    </section>
+  </div>
+
+  <script src="taskpane.js"></script>
+</body>
+</html>
