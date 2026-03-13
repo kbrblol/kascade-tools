@@ -242,6 +242,22 @@ button {
 .btn-icon:hover { background: #f0f0f0; }
 .btn-icon.hidden-state { color: #a0a0a0; }
 
+/* ── Checkbox ─────────────────────────────────── */
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 400;
+  cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  accent-color: #0078d4;
+  cursor: pointer;
+}
+
 /* ── Status messages ──────────────────────────── */
 .status {
   padding: 8px 12px;

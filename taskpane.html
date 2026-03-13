@@ -44,6 +44,20 @@
       </div>
 
       <div class="section">
+        <label class="checkbox-label">
+          <input type="checkbox" id="cascade-overwrite" />
+          Overwrite existing tabs
+        </label>
+        <p class="hint">If a tab with the same name already exists, clear and replace it instead of creating a duplicate.</p>
+      </div>
+
+      <div class="section" id="cascade-keep-section" style="display:none;">
+        <label for="cascade-keep-cols">Columns to keep</label>
+        <input type="text" id="cascade-keep-cols" placeholder="e.g. F,G,H" />
+        <p class="hint">Comma-separated columns to preserve from the existing tab when overwriting.</p>
+      </div>
+
+      <div class="section">
         <button id="btn-cascade" class="btn-primary" disabled>Cascade</button>
       </div>
 

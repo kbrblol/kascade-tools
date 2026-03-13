@@ -43,6 +43,11 @@ function initCascade() {
   document.getElementById("cascade-range").addEventListener("change", onRangeSelected);
   document.getElementById("btn-cascade").addEventListener("click", executeCascade);
 
+  // Toggle "Columns to keep" input visibility based on overwrite checkbox
+  document.getElementById("cascade-overwrite").addEventListener("change", function () {
+    document.getElementById("cascade-keep-section").style.display = this.checked ? "block" : "none";
+  });
+
   // Initial load
   pickActiveCell();
   loadNamedRanges();
@@ -153,57 +158,142 @@ function onRangeSelected() {
   }).catch(function (err) { showStatus("cascade", err.message, "error"); });
 }
 
+// Parse the "Columns to keep" input into an array of column letters
+function parseKeepCols() {
+  var raw = document.getElementById("cascade-keep-cols").value.trim();
+  if (!raw) return [];
+  return raw.split(",").map(function (c) { return c.trim().toUpperCase(); }).filter(function (c) { return c.length > 0; });
+}
+
+// Save column data from an existing sheet for specified columns
+function saveColumnData(ctx, sheet, keepCols) {
+  if (keepCols.length === 0) return Promise.resolve({});
+
+  var used = sheet.getUsedRange();
+  used.load("rowCount");
+  return ctx.sync().then(function () {
+    var rowCount = used.rowCount;
+    var saved = {};
+    var ranges = {};
+
+    keepCols.forEach(function (col) {
+      var rangeAddr = col + "1:" + col + rowCount;
+      ranges[col] = sheet.getRange(rangeAddr);
+      ranges[col].load("values");
+    });
+
+    return ctx.sync().then(function () {
+      keepCols.forEach(function (col) {
+        saved[col] = ranges[col].values;
+      });
+      return saved;
+    });
+  });
+}
+
+// Restore saved column data onto a sheet
+function restoreColumnData(ctx, sheet, savedData) {
+  var cols = Object.keys(savedData);
+  if (cols.length === 0) return Promise.resolve();
+
+  cols.forEach(function (col) {
+    var values = savedData[col];
+    var rangeAddr = col + "1:" + col + values.length;
+    sheet.getRange(rangeAddr).values = values;
+  });
+
+  return ctx.sync();
+}
+
 // Execute the cascade operation
 function executeCascade() {
   var cellAddr = document.getElementById("cascade-cell").value.trim();
   if (!cellAddr) { showStatus("cascade", "Pick a target cell first.", "error"); return; }
   if (cachedRangeValues.length === 0) { showStatus("cascade", "Select a named range with values.", "error"); return; }
 
+  var overwrite = document.getElementById("cascade-overwrite").checked;
+  var keepCols = overwrite ? parseKeepCols() : [];
+
   var btn = document.getElementById("btn-cascade");
   btn.disabled = true;
   btn.textContent = "Working...";
-  showStatus("cascade", "Creating " + cachedRangeValues.length + " sheets...", "info");
+  showStatus("cascade", (overwrite ? "Cascading (overwrite mode)" : "Creating") + " " + cachedRangeValues.length + " sheets...", "info");
 
   Excel.run(function (ctx) {
     var sourceSheet = ctx.workbook.worksheets.getActiveWorksheet();
     sourceSheet.load("name");
     return ctx.sync().then(function () {
       var baseName = sourceSheet.name;
-      var created = 0;
+      var processed = 0;
       var total = cachedRangeValues.length;
 
-      // Build a promise chain that copies one sheet at a time
+      // Build a promise chain that processes one sheet at a time
       var chain = Promise.resolve();
 
       cachedRangeValues.forEach(function (val, idx) {
         chain = chain.then(function () {
           return Excel.run(function (innerCtx) {
             var src = innerCtx.workbook.worksheets.getItem(baseName);
-            var copy = src.copy(Excel.WorksheetPositionType.end);
-            // Load all existing sheet names to ensure uniqueness
             var sheets = innerCtx.workbook.worksheets;
             sheets.load("items/name");
-            copy.load("name");
             return innerCtx.sync().then(function () {
-              // Build set of existing names
+              var targetName = cleanSheetName(val);
               var existingNames = {};
               sheets.items.forEach(function (s) { existingNames[s.name.toLowerCase()] = true; });
-              // Rename the new sheet with uniqueness check
-              var safeName = getUniqueSheetName(cleanSheetName(val), existingNames);
-              copy.name = safeName;
-              // Set the target cell
-              copy.getRange(cellAddr).values = [[val]];
-              return innerCtx.sync();
+
+              var tabExists = existingNames[targetName.toLowerCase()] && targetName.toLowerCase() !== baseName.toLowerCase();
+
+              if (overwrite && tabExists) {
+                // ── Overwrite path: save kept columns, delete old tab, copy fresh, restore columns ──
+                var existingSheet = innerCtx.workbook.worksheets.getItem(targetName);
+                existingSheet.load("name");
+
+                return innerCtx.sync().then(function () {
+                  // Save column data if keepCols specified
+                  if (keepCols.length > 0) {
+                    return saveColumnData(innerCtx, existingSheet, keepCols);
+                  }
+                  return {};
+                }).then(function (savedData) {
+                  // Delete the existing sheet
+                  existingSheet.delete();
+                  return innerCtx.sync().then(function () {
+                    // Copy source sheet
+                    var copy = src.copy(Excel.WorksheetPositionType.end);
+                    copy.load("name");
+                    return innerCtx.sync().then(function () {
+                      copy.name = targetName;
+                      copy.getRange(cellAddr).values = [[val]];
+                      return innerCtx.sync().then(function () {
+                        // Restore kept columns
+                        if (keepCols.length > 0 && Object.keys(savedData).length > 0) {
+                          return restoreColumnData(innerCtx, copy, savedData);
+                        }
+                      });
+                    });
+                  });
+                });
+              } else {
+                // ── Create new path (original behavior) ──
+                var copy = src.copy(Excel.WorksheetPositionType.end);
+                copy.load("name");
+                return innerCtx.sync().then(function () {
+                  var safeName = overwrite ? targetName : getUniqueSheetName(targetName, existingNames);
+                  copy.name = safeName;
+                  copy.getRange(cellAddr).values = [[val]];
+                  return innerCtx.sync();
+                });
+              }
             }).then(function () {
-              created++;
-              showStatus("cascade", "Created " + created + " of " + total + "...", "info");
+              processed++;
+              showStatus("cascade", (overwrite ? "Processed " : "Created ") + processed + " of " + total + "...", "info");
             });
           });
         });
       });
 
       return chain.then(function () {
-        showStatus("cascade", "Done — created " + total + " sheet(s).", "success");
+        showStatus("cascade", "Done — " + (overwrite ? "processed " : "created ") + total + " sheet(s).", "success");
         btn.disabled = false;
         btn.textContent = "Cascade";
       });
